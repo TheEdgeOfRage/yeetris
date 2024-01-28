@@ -16,7 +16,7 @@ type Game struct {
 
 	Scale rl.Vector2
 
-	Board Board
+	Board *Board
 	UI    *UI
 }
 
@@ -49,6 +49,9 @@ func (g *Game) Update() {
 		return
 	}
 
+	if rl.IsKeyPressed(rl.KeyC) {
+		g.Board.HoldPiece()
+	}
 	if rl.IsKeyPressed(rl.KeyI) {
 		g.Board.MoveActivePiece(1)
 	}
@@ -77,7 +80,9 @@ func (g *Game) Draw() {
 	g.UI.Draw(g)
 
 	if !g.GameOver {
-		g.Board.Draw(g.UI.BoardOffset, g.Scale)
+		g.Board.DrawBoard(g.UI.BoardOffset, g.Scale)
+		g.Board.DrawNextPiece(g.UI.NextPiecePosition, g.Scale)
+		g.Board.DrawHeldPiece(g.UI.HeldPiecePosition, g.Scale)
 	} else {
 		rl.DrawText(
 			"PRESS [ENTER] TO PLAY AGAIN",

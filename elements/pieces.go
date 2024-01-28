@@ -8,7 +8,7 @@ type Piece struct {
 	Blocks []*Block
 }
 
-var Pieces = []*Piece{
+var Pieces = []Piece{
 	{
 		Blocks: []*Block{
 			{rl.NewVector2(-1, 0), Cyan, false},
@@ -67,8 +67,24 @@ var Pieces = []*Piece{
 	},
 }
 
-func (p *Piece) Draw(pos rl.Vector2, scale rl.Vector2, offset rl.Vector2) {
+func (p Piece) Draw(pos rl.Vector2, scale rl.Vector2, offset rl.Vector2) {
 	for _, block := range p.Blocks {
 		block.Draw(pos, scale, offset)
 	}
+}
+
+func GetRandomPiece() *Piece {
+	base := Pieces[rl.GetRandomValue(0, int32(len(Pieces)-1))]
+	newPiece := &Piece{
+		Blocks: make([]*Block, 4),
+	}
+	for i, block := range base.Blocks {
+		newPiece.Blocks[i] = &Block{
+			Position: block.Position,
+			Color:    block.Color,
+			LongBoi:  block.LongBoi,
+		}
+	}
+
+	return newPiece
 }

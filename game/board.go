@@ -7,35 +7,30 @@ import (
 	"github.com/gen2brain/raylib-go/raylib"
 )
 
-type Board interface {
-	DescendActivePiece() bool
-	DropActivePiece() bool
-	MoveActivePiece(direction int)
-	RotateActivePiece(clockwise bool)
-	ClearLines()
-	Draw(offset, scale rl.Vector2)
-}
-
-type board struct {
+type Board struct {
 	Board [10][20]*elements.Block
 
 	ActivePiece    *elements.Piece
 	ActivePiecePos rl.Vector2
 	NextPiece      *elements.Piece
+	HeldPiece      *elements.Piece
+	AlreadyHeld    bool
 }
 
-var _ Board = (*board)(nil)
-
-func InitBoard() *board {
-	board := &board{}
-	board.newActivePiece()
+func InitBoard() *Board {
+	board := &Board{
+		NextPiece: elements.GetRandomPiece(),
+	}
+	board.getNextPiece()
 
 	return board
 }
 
-func (b *board) newActivePiece() bool {
+func (b *Board) getNextPiece() bool {
+	b.AlreadyHeld = false
 	b.ActivePiecePos = rl.NewVector2(5, 0)
-	b.ActivePiece = elements.Pieces[rl.GetRandomValue(0, int32(len(elements.Pieces)-1))]
+	b.ActivePiece = b.NextPiece
+	b.NextPiece = elements.GetRandomPiece()
 	for _, block := range b.ActivePiece.Blocks {
 		newX, newY := b.ActivePiecePos.X+block.Position.X, b.ActivePiecePos.Y+block.Position.Y
 		if newY >= 0 && b.Board[int(newX)][int(newY)] != nil {
@@ -45,7 +40,7 @@ func (b *board) newActivePiece() bool {
 	return false
 }
 
-func (b *board) setBlocksFromActivePiece() {
+func (b *Board) setBlocksFromActivePiece() {
 	for _, block := range b.ActivePiece.Blocks {
 		newX, newY := b.ActivePiecePos.X+block.Position.X, b.ActivePiecePos.Y+block.Position.Y
 		b.Board[int(newX)][int(newY)] = &elements.Block{
@@ -55,7 +50,7 @@ func (b *board) setBlocksFromActivePiece() {
 	}
 }
 
-func (b *board) checkHorizontalCollision(left bool) bool {
+func (b *Board) checkHorizontalCollision(left bool) bool {
 	for _, activeBlock := range b.ActivePiece.Blocks {
 		xPos := int(b.ActivePiecePos.X + activeBlock.Position.X)
 		yPos := int(b.ActivePiecePos.Y + activeBlock.Position.Y)
@@ -78,7 +73,7 @@ func (b *board) checkHorizontalCollision(left bool) bool {
 	return false
 }
 
-func (b *board) descendActivePiece() bool {
+func (b *Board) descendActivePiece() bool {
 	b.ActivePiecePos.Y += 1
 	for _, activeBlock := range b.ActivePiece.Blocks {
 		if b.ActivePiecePos.Y+activeBlock.Position.Y == 20 {
@@ -98,23 +93,23 @@ func (b *board) descendActivePiece() bool {
 
 // DescendActivePiece moves the piece down by one block. If the piece cannot move down, it will be placed on the board.
 // After that, a new piece will be generated. If the new piece cannot be placed, true is returned.
-func (b *board) DescendActivePiece() bool {
+func (b *Board) DescendActivePiece() bool {
 	if b.descendActivePiece() {
-		return b.newActivePiece()
+		return b.getNextPiece()
 	}
 	return false
 }
 
 // DropActivePiece moves the piece down until it cannot move down anymore. After that, a new piece will be generated.
 // If the new piece cannot be placed, true is returned.
-func (b *board) DropActivePiece() bool {
+func (b *Board) DropActivePiece() bool {
 	for !b.descendActivePiece() {
 	}
-	return b.newActivePiece()
+	return b.getNextPiece()
 }
 
 // MoveActivePiece moves the piece left or right. If the piece cannot move in the specified direction, nothing happens.
-func (b *board) MoveActivePiece(direction int) {
+func (b *Board) MoveActivePiece(direction int) {
 	if !b.checkHorizontalCollision(direction == -1) {
 		b.ActivePiecePos.X += float32(direction)
 	}
@@ -130,7 +125,7 @@ func getCollisionDepth(collisionDepth int, longBoi bool) int {
 
 // RotateActivePiece rotates the piece clockwise or counter-clockwise. If the piece cannot rotate in the specified
 // direction, nothing happens.
-func (b *board) RotateActivePiece(clockwise bool) {
+func (b *Board) RotateActivePiece(clockwise bool) {
 	if b.ActivePiece.Blocks[0].Color == elements.Yellow {
 		return
 	}
@@ -195,8 +190,22 @@ func (b *board) RotateActivePiece(clockwise bool) {
 	b.ActivePiece = tmpPiece
 }
 
+func (b *Board) HoldPiece() {
+	if b.AlreadyHeld {
+		return
+	}
+	b.AlreadyHeld = true
+	if b.HeldPiece == nil {
+		b.HeldPiece = b.ActivePiece
+		b.getNextPiece()
+		return
+	}
+	b.HeldPiece, b.ActivePiece = b.ActivePiece, b.HeldPiece
+	b.ActivePiecePos = rl.NewVector2(5, 0)
+}
+
 // ClearLines clears all lines that are completely filled.
-func (g *board) ClearLines() {
+func (g *Board) ClearLines() {
 	for y := 19; y >= 0; {
 		skip := false
 		for x := 0; x < 10; x++ {
@@ -225,7 +234,7 @@ func (g *board) ClearLines() {
 	}
 }
 
-func (b *board) drawGrid(offset, scale rl.Vector2) {
+func (b *Board) DrawGrid(offset, scale rl.Vector2) {
 	for i := 0; i < 10; i++ {
 		rl.DrawLine(
 			int32(scale.X*float32(i)+offset.X),
@@ -246,9 +255,38 @@ func (b *board) drawGrid(offset, scale rl.Vector2) {
 	}
 }
 
-// Draw draws the board with placed blocks and the active piece.
-func (b *board) Draw(offset rl.Vector2, scale rl.Vector2) {
-	b.drawGrid(offset, scale)
+func (b *Board) drawUIPiece(piece *elements.Piece, position, scale rl.Vector2) {
+	centerOffset := rl.NewVector2(0, 0)
+	for _, block := range piece.Blocks {
+		centerOffset = rl.Vector2Add(
+			centerOffset,
+			rl.Vector2Add(block.Position, rl.NewVector2(0.5, 0.5)),
+		)
+	}
+	centerOffset = rl.Vector2Divide(centerOffset, rl.NewVector2(4, 4))
+	centerOffset = rl.Vector2Add(centerOffset, rl.NewVector2(0, 1))
+	centerOffset = rl.Vector2Multiply(centerOffset, scale)
+	for _, block := range piece.Blocks {
+		block.Draw(rl.NewVector2(0, 1), scale, rl.Vector2Subtract(position, centerOffset))
+	}
+}
+
+// DrawNextPiece draws the next piece in the UI at the specified position.
+func (b *Board) DrawNextPiece(position, scale rl.Vector2) {
+	b.drawUIPiece(b.NextPiece, position, scale)
+}
+
+// DrawHeldPiece draws the held piece in the UI at the specified position.
+func (b *Board) DrawHeldPiece(position, scale rl.Vector2) {
+	if b.HeldPiece == nil {
+		return
+	}
+	b.drawUIPiece(b.HeldPiece, position, scale)
+}
+
+// DrawBoard draws the board with placed blocks and the active piece.
+func (b *Board) DrawBoard(offset rl.Vector2, scale rl.Vector2) {
+	// b.DrawGrid(offset, scale)
 	for i := 0; i < 20; i++ {
 		for j := 0; j < 10; j++ {
 			if b.Board[j][i] == nil {
