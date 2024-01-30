@@ -21,12 +21,12 @@ func InitBoard() *Board {
 	board := &Board{
 		NextPiece: elements.GetRandomPiece(),
 	}
-	board.getNextPiece()
+	_ = board.getNextPiece()
 
 	return board
 }
 
-func (b *Board) getNextPiece() bool {
+func (b *Board) getNextPiece() error {
 	b.AlreadyHeld = false
 	b.ActivePiecePos = rl.NewVector2(5, 0)
 	b.ActivePiece = b.NextPiece
@@ -34,20 +34,25 @@ func (b *Board) getNextPiece() bool {
 	for _, block := range b.ActivePiece.Blocks {
 		newX, newY := b.ActivePiecePos.X+block.Position.X, b.ActivePiecePos.Y+block.Position.Y
 		if newY >= 0 && b.Board[int(newX)][int(newY)] != nil {
-			return true
+			return ErrGameOver
 		}
 	}
-	return false
+	return nil
 }
 
-func (b *Board) setBlocksFromActivePiece() {
+func (b *Board) setBlocksFromActivePiece() error {
 	for _, block := range b.ActivePiece.Blocks {
 		newX, newY := b.ActivePiecePos.X+block.Position.X, b.ActivePiecePos.Y+block.Position.Y
+		if newY < 0 {
+			return ErrGameOver
+		}
 		b.Board[int(newX)][int(newY)] = &elements.Block{
 			Position: rl.NewVector2(newX, newY),
 			Color:    b.ActivePiece.Blocks[0].Color,
 		}
 	}
+
+	return nil
 }
 
 func (b *Board) checkHorizontalCollision(left bool) bool {
@@ -73,37 +78,43 @@ func (b *Board) checkHorizontalCollision(left bool) bool {
 	return false
 }
 
-func (b *Board) descendActivePiece() bool {
+func (b *Board) descendActivePiece() (bool, error) {
 	b.ActivePiecePos.Y += 1
 	for _, activeBlock := range b.ActivePiece.Blocks {
-		if b.ActivePiecePos.Y+activeBlock.Position.Y == 20 {
+		if b.ActivePiecePos.Y+activeBlock.Position.Y == 20 ||
+			b.Board[int(b.ActivePiecePos.X+activeBlock.Position.X)][int(b.ActivePiecePos.Y+activeBlock.Position.Y)] != nil {
 			b.ActivePiecePos.Y -= 1
-			b.setBlocksFromActivePiece()
-			return true
-		}
-
-		if b.Board[int(b.ActivePiecePos.X+activeBlock.Position.X)][int(b.ActivePiecePos.Y+activeBlock.Position.Y)] != nil {
-			b.ActivePiecePos.Y -= 1
-			b.setBlocksFromActivePiece()
-			return true
+			return true, b.setBlocksFromActivePiece()
 		}
 	}
-	return false
+	return false, nil
 }
 
 // DescendActivePiece moves the piece down by one block. If the piece cannot move down, it will be placed on the board.
-// After that, a new piece will be generated. If the new piece cannot be placed, true is returned.
-func (b *Board) DescendActivePiece() bool {
-	if b.descendActivePiece() {
+// After that, a new piece will be generated. If the new piece cannot be placed, a game over error is returned.
+func (b *Board) DescendActivePiece() error {
+	placed, err := b.descendActivePiece()
+	if err != nil {
+		return err
+	}
+
+	if placed {
 		return b.getNextPiece()
 	}
-	return false
+	return nil
 }
 
 // DropActivePiece moves the piece down until it cannot move down anymore. After that, a new piece will be generated.
-// If the new piece cannot be placed, true is returned.
-func (b *Board) DropActivePiece() bool {
-	for !b.descendActivePiece() {
+// If the new piece cannot be placed, a game over error is returned.
+func (b *Board) DropActivePiece() error {
+	for {
+		placed, err := b.descendActivePiece()
+		if err != nil {
+			return err
+		}
+		if placed {
+			break
+		}
 	}
 	return b.getNextPiece()
 }
@@ -197,7 +208,7 @@ func (b *Board) HoldPiece() {
 	b.AlreadyHeld = true
 	if b.HeldPiece == nil {
 		b.HeldPiece = b.ActivePiece
-		b.getNextPiece()
+		_ = b.getNextPiece()
 		return
 	}
 	b.HeldPiece, b.ActivePiece = b.ActivePiece, b.HeldPiece

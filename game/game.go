@@ -1,11 +1,13 @@
 package game
 
 import (
-	"gitea.theedgeofrage.com/theedgeofrage/yeetris/elements"
 	"github.com/gen2brain/raylib-go/raylib"
+	"github.com/go-errors/errors"
+
+	"gitea.theedgeofrage.com/theedgeofrage/yeetris/elements"
 )
 
-const DEBUG = false
+var ErrGameOver = errors.New("game over")
 
 // Game type
 type Game struct {
@@ -33,6 +35,7 @@ func (g *Game) Init() {
 }
 
 func (g *Game) Update() {
+	var err error
 	defer g.Board.ClearLines()
 	if g.GameOver {
 		if rl.IsKeyPressed(rl.KeyEnter) {
@@ -62,13 +65,16 @@ func (g *Game) Update() {
 		g.Board.RotateActivePiece(true)
 	}
 	if rl.IsKeyPressed(rl.KeyN) {
-		g.Board.DescendActivePiece()
+		err = g.Board.DescendActivePiece()
 	}
 	if rl.IsKeyPressed(rl.KeySpace) {
-		g.Board.DropActivePiece()
+		err = g.Board.DropActivePiece()
 	}
-	if g.FramesCounter%g.TickRate == 0 && !DEBUG {
-		g.Board.DescendActivePiece()
+	if g.FramesCounter%g.TickRate == 0 {
+		err = g.Board.DescendActivePiece()
+	}
+	if errors.Is(err, ErrGameOver) {
+		g.GameOver = true
 	}
 	g.FramesCounter++
 }
