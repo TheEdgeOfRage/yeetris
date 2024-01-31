@@ -36,7 +36,6 @@ func (g *Game) Init() {
 
 func (g *Game) Update() {
 	var err error
-	defer g.Board.ClearLines()
 	if g.GameOver {
 		if rl.IsKeyPressed(rl.KeyEnter) {
 			g.Init()
@@ -75,6 +74,18 @@ func (g *Game) Update() {
 	}
 	if errors.Is(err, ErrGameOver) {
 		g.GameOver = true
+	}
+
+	clearedLines := g.Board.ClearLines()
+	switch clearedLines {
+	case 1:
+		g.UI.Score += 40
+	case 2:
+		g.UI.Score += 100
+	case 3:
+		g.UI.Score += 300
+	case 4:
+		g.UI.Score += 1200
 	}
 	g.FramesCounter++
 }

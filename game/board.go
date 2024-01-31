@@ -216,7 +216,8 @@ func (b *Board) HoldPiece() {
 }
 
 // ClearLines clears all lines that are completely filled.
-func (g *Board) ClearLines() {
+func (g *Board) ClearLines() int {
+	clearedLines := 0
 	for y := 19; y >= 0; {
 		skip := false
 		for x := 0; x < 10; x++ {
@@ -229,8 +230,15 @@ func (g *Board) ClearLines() {
 			y--
 			continue
 		}
-		for ty := y; ty > 0; ty-- {
+		clearedLines++
+		for ty := y; ty >= 0; ty-- {
 			for x := 0; x < 10; x++ {
+				// always clear top line
+				if ty == 0 {
+					g.Board[x][ty] = nil
+					continue
+				}
+				// move all blocks above cleared line down
 				if g.Board[x][ty-1] != nil {
 					g.Board[x][ty] = g.Board[x][ty-1]
 					g.Board[x][ty].Position.Y++
@@ -239,10 +247,8 @@ func (g *Board) ClearLines() {
 				}
 			}
 		}
-		for x := 0; x < 10; x++ {
-			g.Board[x][0] = nil
-		}
 	}
+	return clearedLines
 }
 
 func (b *Board) DrawGrid(offset, scale rl.Vector2) {
